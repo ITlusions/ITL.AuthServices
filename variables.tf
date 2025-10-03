@@ -173,8 +173,8 @@ variable "secure_ldap_certificate_thumbprint" {
   default     = ""
 
   validation {
-    condition = var.enable_secure_ldap == false || (var.enable_secure_ldap == true && length(var.secure_ldap_certificate_thumbprint) > 0)
-    error_message = "Certificate thumbprint is required when secure LDAP is enabled."
+    condition = var.secure_ldap_certificate_thumbprint == "" || length(var.secure_ldap_certificate_thumbprint) >= 40
+    error_message = "Certificate thumbprint must be at least 40 characters long when provided."
   }
 }
 
