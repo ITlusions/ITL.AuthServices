@@ -70,6 +70,27 @@ delegation {
 }
 ```
 
+#### Issue: Invalid Reference in Variable Validation
+```
+Error: Invalid reference in variable validation
+The condition for variable "variable_name" can only refer to the variable itself
+```
+
+**Solution**: Variable validation conditions cannot reference other variables
+```hcl
+# ❌ Incorrect - referencing other variables
+validation {
+  condition = var.enable_feature == false || (var.enable_feature == true && length(var.other_variable) > 0)
+  error_message = "Other variable is required when feature is enabled."
+}
+
+# ✅ Correct - only referencing the variable itself  
+validation {
+  condition = var.other_variable == "" || length(var.other_variable) >= 40
+  error_message = "Variable must be at least 40 characters when provided."
+}
+```
+
 #### Issue: Invalid Domain Name
 ```
 Error: Domain name must be a valid DNS name
