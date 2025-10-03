@@ -78,18 +78,12 @@ stages:
         workingDirectory: $(workingDirectory)
 
     - task: PowerShell@2
-      displayName: 'Create Sample Variables File'
+      displayName: 'Create CI Variables File'
       inputs:
         targetType: 'inline'
         script: |
-          @"
-          domain_name = "example.com"
-          domain_admin_users = ["admin@example.com"]
-          location = "West Europe"
-          sku = "Standard"
-          enable_secure_ldap = false
-          enable_diagnostic_settings = true
-          "@ | Out-File -FilePath "terraform.tfvars" -Encoding UTF8
+          # Use the CI-specific configuration for pipeline validation
+          Write-Host "Using terraform.tfvars.ci for pipeline validation"
         workingDirectory: $(workingDirectory)
 
     - task: PowerShell@2
@@ -99,7 +93,7 @@ stages:
         script: |
           $env:ARM_SKIP_PROVIDER_REGISTRATION = "true"
           $env:ARM_USE_CLI = "false"
-          terraform plan -input=false -out=tfplan
+          terraform plan -var-file="terraform.tfvars.ci" -input=false -out=tfplan
         workingDirectory: $(workingDirectory)
       continueOnError: true
 

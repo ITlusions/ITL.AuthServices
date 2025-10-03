@@ -17,6 +17,9 @@ terraform state list
 terraform validate
 terraform plan
 
+# CI/CD testing (no Azure auth required)
+ARM_SKIP_PROVIDER_REGISTRATION=true ARM_USE_CLI=false terraform plan -var-file="terraform.tfvars.ci"
+
 # Check Azure resources
 az login
 az account show

@@ -72,6 +72,15 @@ docs: ## Generate Terraform documentation
 test: format-check validate security ## Run all tests and validations
 	@echo "All tests completed successfully!"
 
+test-ci: ## Run CI validation with mock configuration (no Azure auth required)
+	@echo "Running CI validation with mock configuration..."
+	@export ARM_SKIP_PROVIDER_REGISTRATION=true ARM_USE_CLI=false; \
+	terraform init -backend=false; \
+	terraform validate; \
+	terraform plan -var-file="terraform.tfvars.ci" -out=tfplan.ci; \
+	rm -f tfplan.ci; \
+	echo "CI validation completed successfully!"
+
 test-local: ## Run local validation with sample data
 	@echo "Running local validation with sample data..."
 	@cp terraform.tfvars.example terraform.tfvars.test

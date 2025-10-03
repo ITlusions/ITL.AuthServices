@@ -1,0 +1,49 @@
+# CI/CD Testing Configuration for Microsoft Entra Domain Services
+# This file is used for Terraform validation in CI/CD pipelines
+# It uses minimal values that pass validation without requiring Azure authentication
+
+# General Configuration
+location            = "westeurope"
+resource_group_name = "rg-entraid-domain-services-ci"
+
+# Domain Configuration
+domain_name = "example.local"
+
+# Network Configuration
+vnet_name                      = "vnet-entraid-ci"
+vnet_address_space            = "10.99.0.0/16"
+domain_services_subnet_name   = "snet-domain-services-ci"
+domain_services_subnet_prefix = "10.99.1.0/24"
+nsg_name                      = "nsg-domain-services-ci"
+
+# SKU Configuration (minimal for testing)
+sku = "Standard"
+
+# Security Configuration (disabled for CI testing)
+enable_secure_ldap = false
+filtered_sync      = false
+domain_configuration_type = "FullySynced"
+
+# Network access configuration
+ldap_source_address_prefix = "10.99.0.0/16"
+management_source_address_prefix = "10.99.0.0/16"
+enable_powershell_remoting = false
+enable_rdp = false
+
+# Common tags for CI testing
+common_tags = {
+  Environment = "CI/CD"
+  Project     = "Authentication Infrastructure"
+  Owner       = "CI/CD Pipeline"
+  CostCenter  = "Testing"
+}
+
+# Replica sets (empty for CI testing)
+replica_sets = []
+
+# Notification settings (minimal for testing)
+notification_settings = {
+  notify_dc_admins         = false
+  notify_global_admins     = false
+  additional_recipients    = []
+}

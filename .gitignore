@@ -18,6 +18,10 @@ crash.*.log
 *.tfvars
 *.tfvars.json
 
+# Exception: Include example and CI configuration files
+!terraform.tfvars.example
+!terraform.tfvars.ci
+
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
 override.tf

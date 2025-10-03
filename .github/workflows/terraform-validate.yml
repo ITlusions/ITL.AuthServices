@@ -58,14 +58,8 @@ jobs:
     - name: Terraform Plan (Dry Run)
       id: plan
       run: |
-        # Create a dummy tfvars file for validation
-        cat > terraform.tfvars << EOF
-        domain_name = "example.com"
-        domain_admin_users = ["admin@example.com"]
-        location = "West Europe"
-        EOF
-        
-        terraform plan -input=false -out=tfplan
+        # Use CI-specific configuration for validation
+        terraform plan -var-file="terraform.tfvars.ci" -input=false -out=tfplan
       working-directory: ${{ env.TERRAFORM_DIR }}
       env:
         ARM_SKIP_PROVIDER_REGISTRATION: true

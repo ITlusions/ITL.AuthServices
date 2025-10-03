@@ -26,6 +26,36 @@ A comprehensive Terraform template for deploying Microsoft Entra Domain Services
    terraform apply
    ```
 
+## 🧪 Testing and Development
+
+### Local Testing
+```bash
+# Linux/macOS with Make
+make test       # Run all validations
+make test-ci    # Run CI validation (no Azure auth required)
+make format     # Format code
+make security   # Security scan
+
+# Windows with PowerShell
+.\scripts.ps1 test       # Run all validations
+.\scripts.ps1 test-ci    # Run CI validation (no Azure auth required)
+.\scripts.ps1 format     # Format code
+.\scripts.ps1 security   # Security scan
+.\scripts.ps1 help       # Show all available commands
+```
+
+### CI/CD Configuration
+The template includes `terraform.tfvars.ci` for automated testing:
+- ✅ Works without Azure authentication
+- ✅ Validates all Terraform syntax and logic
+- ✅ Tests variable validations and constraints
+- ✅ Generates plan output for review
+
+```bash
+# CI/CD testing command
+ARM_SKIP_PROVIDER_REGISTRATION=true ARM_USE_CLI=false terraform plan -var-file="terraform.tfvars.ci"
+```
+
 ## 🌟 Key Features
 
 - ✅ **Complete Domain Services Setup**: Fully configured Entra Domain Services instance
