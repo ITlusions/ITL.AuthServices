@@ -109,25 +109,7 @@ jobs:
         echo "Terraform validation failed."
         exit 1
 
-  terraform-docs:
-    name: Generate Terraform Documentation
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Generate Terraform docs
-      uses: terraform-docs/gh-actions@v1.0.0
-      with:
-        working-dir: .
-        output-file: docs/TERRAFORM_DOCS.md
-        output-method: inject
-        git-push: "true"
-        git-commit-message: "docs: update Terraform documentation [skip ci]"
 
   cost-estimation:
     name: Cost Estimation
