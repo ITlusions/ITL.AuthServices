@@ -2,7 +2,7 @@
 # Copy this file to terraform.tfvars and customize the values for your environment
 
 # General Configuration
-location            = "West Europe"
+location            = "westeurope"
 resource_group_name = "rg-entraid-domain-services"
 
 # Common tags for all resources
