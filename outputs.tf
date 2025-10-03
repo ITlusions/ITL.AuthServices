@@ -116,11 +116,11 @@ output "secure_ldap_enabled" {
 output "ldap_connection_info" {
   description = "LDAP connection information"
   value = {
-    ldap_port         = "389"
-    ldaps_port        = "636"
-    domain_name       = jsondecode(azapi_resource.domain_services.output).properties.domainName
-    subnet_cidr       = azurerm_subnet.domain_services.address_prefixes[0]
-    dns_servers       = "Provided by Azure AD Domain Services"
+    ldap_port   = "389"
+    ldaps_port  = "636"
+    domain_name = jsondecode(azapi_resource.domain_services.output).properties.domainName
+    subnet_cidr = azurerm_subnet.domain_services.address_prefixes[0]
+    dns_servers = "Provided by Azure AD Domain Services"
   }
 }
 
@@ -128,9 +128,9 @@ output "ldap_connection_info" {
 output "domain_administrators_group" {
   description = "Information about the Domain Administrators group"
   value = {
-    group_id      = data.azuread_group.dc_administrators.object_id
-    display_name  = data.azuread_group.dc_administrators.display_name
-    admin_users   = var.domain_admin_users
+    group_id     = data.azuread_group.dc_administrators.object_id
+    display_name = data.azuread_group.dc_administrators.display_name
+    admin_users  = var.domain_admin_users
   }
 }
 
@@ -144,8 +144,8 @@ output "common_tags" {
 output "backup_storage_account" {
   description = "Information about the backup storage account (if enabled)"
   value = var.enable_backup && var.sku == "Enterprise" ? {
-    id           = azurerm_storage_account.backup[0].id
-    name         = azurerm_storage_account.backup[0].name
+    id                    = azurerm_storage_account.backup[0].id
+    name                  = azurerm_storage_account.backup[0].name
     primary_blob_endpoint = azurerm_storage_account.backup[0].primary_blob_endpoint
   } : null
 }

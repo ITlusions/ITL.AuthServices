@@ -173,7 +173,7 @@ variable "secure_ldap_certificate_thumbprint" {
   default     = ""
 
   validation {
-    condition = var.secure_ldap_certificate_thumbprint == "" || length(var.secure_ldap_certificate_thumbprint) >= 40
+    condition     = var.secure_ldap_certificate_thumbprint == "" || length(var.secure_ldap_certificate_thumbprint) >= 40
     error_message = "Certificate thumbprint must be at least 40 characters long when provided."
   }
 }
@@ -189,8 +189,8 @@ variable "secure_ldap_certificate_password" {
 variable "notification_settings" {
   description = "Email notification settings"
   type = object({
-    notify_global_admins = optional(bool, true)
-    notify_dc_admins     = optional(bool, true)
+    notify_global_admins  = optional(bool, true)
+    notify_dc_admins      = optional(bool, true)
     additional_recipients = optional(list(string), [])
   })
   default = {

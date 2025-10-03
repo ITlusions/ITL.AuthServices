@@ -205,18 +205,18 @@ resource "azapi_resource" "domain_services" {
 
   body = jsonencode({
     properties = {
-      domainName         = var.domain_name
+      domainName              = var.domain_name
       domainConfigurationType = var.domain_configuration_type
-      sku                = var.sku
-      filteredSync       = var.sku == "Enterprise" ? var.filtered_sync : "Disabled"
-      
+      sku                     = var.sku
+      filteredSync            = var.sku == "Enterprise" ? var.filtered_sync : "Disabled"
+
       # Initial replica set (primary)
       replicaSets = concat([
         {
           subnetId = azurerm_subnet.domain_services.id
           location = azurerm_resource_group.main.location
         }
-      ], [
+        ], [
         for idx, replica in var.replica_sets : {
           subnetId = replica.subnet_id != null ? replica.subnet_id : azurerm_subnet.replica_sets[idx].id
           location = replica.location
@@ -225,19 +225,19 @@ resource "azapi_resource" "domain_services" {
 
       # Notification settings
       notificationSettings = {
-        notifyGlobalAdmins = var.notification_settings.notify_global_admins
-        notifyDcAdmins     = var.notification_settings.notify_dc_admins
+        notifyGlobalAdmins   = var.notification_settings.notify_global_admins
+        notifyDcAdmins       = var.notification_settings.notify_dc_admins
         additionalRecipients = var.notification_settings.additional_recipients
       }
 
       # Secure LDAP configuration
       ldapsSettings = var.enable_secure_ldap ? {
-        ldaps = "Enabled"
-        pfxCertificate = base64encode(file("${path.module}/certificates/secure-ldap.pfx"))
+        ldaps                  = "Enabled"
+        pfxCertificate         = base64encode(file("${path.module}/certificates/secure-ldap.pfx"))
         pfxCertificatePassword = var.secure_ldap_certificate_password
-        externalAccess = "Enabled"
-        certificateThumbprint = var.secure_ldap_certificate_thumbprint
-      } : {
+        externalAccess         = "Enabled"
+        certificateThumbprint  = var.secure_ldap_certificate_thumbprint
+        } : {
         ldaps = "Disabled"
       }
     }
