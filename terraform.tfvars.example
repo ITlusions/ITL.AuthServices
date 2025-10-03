@@ -1,0 +1,84 @@
+# Example Terraform variables file for Microsoft Entra Domain Services
+# Copy this file to terraform.tfvars and customize the values for your environment
+
+# General Configuration
+location            = "West Europe"
+resource_group_name = "rg-entraid-domain-services"
+
+# Common tags for all resources
+common_tags = {
+  Environment = "Production"
+  Project     = "Authentication Infrastructure"
+  Owner       = "IT Operations"
+  CostCenter  = "IT"
+  CreatedBy   = "Terraform"
+}
+
+# Network Configuration
+vnet_name                       = "vnet-entraid-domain-services"
+vnet_address_space              = "10.1.0.0/16"
+domain_services_subnet_name     = "snet-domain-services"
+domain_services_subnet_prefix   = "10.1.1.0/24"
+nsg_name                        = "nsg-domain-services"
+
+# Domain Configuration (REQUIRED - Update with your domain)
+domain_name = "yourdomain.com"
+
+# Optional: Replica sets for high availability
+# replica_sets = [
+#   {
+#     location      = "North Europe"
+#     subnet_prefix = "10.1.2.0/24"
+#   }
+# ]
+
+# Security Configuration
+sku                           = "Standard"  # Options: Standard, Enterprise
+filtered_sync                 = false      # Enterprise SKU only
+domain_configuration_type     = "FullySynced"  # Options: FullySynced, ResourceTrusting
+
+# Network Security
+ldap_source_address_prefix       = "VirtualNetwork"  # Restrict LDAP access
+management_source_address_prefix = "10.1.0.0/16"     # Restrict management access
+enable_powershell_remoting      = false              # Enable PowerShell remoting
+enable_rdp                      = false              # Enable RDP access
+
+# Secure LDAP Configuration (Optional)
+enable_secure_ldap                   = false
+# secure_ldap_certificate_thumbprint = "YOUR_CERTIFICATE_THUMBPRINT"
+# secure_ldap_certificate_password   = "YOUR_CERTIFICATE_PASSWORD"
+
+# Notification Settings
+notification_settings = {
+  notify_global_admins  = true
+  notify_dc_admins      = true
+  additional_recipients = [
+    # "admin@yourdomain.com"
+  ]
+}
+
+# Domain Administrators (REQUIRED - Update with your admin users)
+domain_admin_users = [
+  # "admin@yourdomain.com",
+  # "domainadmin@yourdomain.com"
+]
+
+# Monitoring and Diagnostics
+enable_diagnostic_settings = true
+# log_analytics_workspace_id = "/subscriptions/YOUR_SUBSCRIPTION_ID/resourceGroups/YOUR_RG/providers/Microsoft.OperationalInsights/workspaces/YOUR_WORKSPACE"
+
+diagnostic_log_categories = [
+  "SystemSecurity",
+  "AccountManagement",
+  "LogonLogoff",
+  "ObjectAccess",
+  "PolicyChange",
+  "PrivilegeUse",
+  "DetailTracking",
+  "DirectoryServiceAccess",
+  "AccountLogon"
+]
+
+# Backup Configuration (Enterprise SKU only)
+enable_backup         = false  # Enterprise SKU only
+backup_retention_days = 30

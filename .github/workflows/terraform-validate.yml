@@ -1,0 +1,193 @@
+name: Terraform Validation
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - '**.tf'
+      - '**.tfvars.example'
+      - '.github/workflows/terraform-validate.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.tf'
+      - '**.tfvars.example'
+      - '.github/workflows/terraform-validate.yml'
+  workflow_dispatch:
+
+env:
+  TF_VERSION: '1.5.0'
+  TERRAFORM_DIR: '.'
+
+jobs:
+  terraform-validate:
+    name: Terraform Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Terraform Format Check
+      id: fmt
+      run: terraform fmt -check=true -recursive
+      working-directory: ${{ env.TERRAFORM_DIR }}
+      continue-on-error: true
+
+    - name: Terraform Init
+      id: init
+      run: terraform init -backend=false
+      working-directory: ${{ env.TERRAFORM_DIR }}
+
+    - name: Terraform Validate
+      id: validate
+      run: terraform validate
+      working-directory: ${{ env.TERRAFORM_DIR }}
+
+    - name: Terraform Security Scan (tfsec)
+      uses: aquasecurity/tfsec-action@v1.0.3
+      with:
+        working_directory: ${{ env.TERRAFORM_DIR }}
+        soft_fail: true
+
+    - name: Terraform Plan (Dry Run)
+      id: plan
+      run: |
+        # Create a dummy tfvars file for validation
+        cat > terraform.tfvars << EOF
+        domain_name = "example.com"
+        domain_admin_users = ["admin@example.com"]
+        location = "West Europe"
+        EOF
+        
+        terraform plan -input=false -out=tfplan
+      working-directory: ${{ env.TERRAFORM_DIR }}
+      env:
+        ARM_SKIP_PROVIDER_REGISTRATION: true
+        ARM_USE_CLI: false
+      continue-on-error: true
+
+    - name: Comment PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const output = `
+          ## Terraform Validation Results 🚀
+          
+          #### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+          #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+          #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+          #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+          
+          <details><summary>Show Plan</summary>
+          
+          \`\`\`terraform
+          ${{ steps.plan.outputs.stdout }}
+          \`\`\`
+          
+          </details>
+          
+          *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: output
+          })
+
+    - name: Terraform Format Check Status
+      if: steps.fmt.outcome == 'failure'
+      run: |
+        echo "Terraform files are not properly formatted."
+        echo "Run 'terraform fmt -recursive' to fix formatting issues."
+        exit 1
+
+    - name: Terraform Validation Status
+      if: steps.validate.outcome == 'failure'
+      run: |
+        echo "Terraform validation failed."
+        exit 1
+
+  terraform-docs:
+    name: Generate Terraform Documentation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Generate Terraform docs
+      uses: terraform-docs/gh-actions@v1.0.0
+      with:
+        working-dir: .
+        output-file: docs/TERRAFORM_DOCS.md
+        output-method: inject
+        git-push: "true"
+        git-commit-message: "docs: update Terraform documentation [skip ci]"
+
+  cost-estimation:
+    name: Cost Estimation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ env.TF_VERSION }}
+
+    - name: Terraform Init
+      run: terraform init -backend=false
+      working-directory: ${{ env.TERRAFORM_DIR }}
+
+    - name: Create sample tfvars
+      run: |
+        cat > terraform.tfvars << EOF
+        domain_name = "example.com"
+        domain_admin_users = ["admin@example.com"]
+        location = "West Europe"
+        sku = "Standard"
+        EOF
+      working-directory: ${{ env.TERRAFORM_DIR }}
+
+    - name: Terraform Plan for Infracost
+      run: terraform plan -out=tfplan.binary
+      working-directory: ${{ env.TERRAFORM_DIR }}
+      env:
+        ARM_SKIP_PROVIDER_REGISTRATION: true
+        ARM_USE_CLI: false
+      continue-on-error: true
+
+    - name: Setup Infracost
+      uses: infracost/actions/setup@v2
+      with:
+        api-key: ${{ secrets.INFRACOST_API_KEY }}
+      continue-on-error: true
+
+    - name: Generate Infracost cost estimate
+      if: env.INFRACOST_API_KEY != ''
+      run: |
+        infracost breakdown --path=${{ env.TERRAFORM_DIR }} \
+                            --format=json \
+                            --out-file=/tmp/infracost.json
+        infracost comment github --path=/tmp/infracost.json \
+                                 --repo=$GITHUB_REPOSITORY \
+                                 --github-token=${{ secrets.GITHUB_TOKEN }} \
+                                 --pull-request=${{ github.event.pull_request.number }} \
+                                 --behavior=update
+      continue-on-error: true
+      env:
+        INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}

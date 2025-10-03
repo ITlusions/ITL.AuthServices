@@ -1,0 +1,255 @@
+# Azure DevOps Pipeline for Terraform Validation
+# Validates Terraform configuration for Microsoft Entra Domain Services
+
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+  paths:
+    include:
+    - '*.tf'
+    - '*.tfvars.example'
+    - 'azure-pipelines.yml'
+
+pr:
+  branches:
+    include:
+    - main
+  paths:
+    include:
+    - '*.tf'
+    - '*.tfvars.example'
+    - 'azure-pipelines.yml'
+
+variables:
+  terraformVersion: '1.5.0'
+  vmImageName: 'ubuntu-latest'
+  workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+pool:
+  vmImage: $(vmImageName)
+
+stages:
+- stage: TerraformValidation
+  displayName: 'Terraform Validation'
+  jobs:
+  - job: ValidateTerraform
+    displayName: 'Validate Terraform Configuration'
+    steps:
+    
+    - task: TerraformInstaller@0
+      displayName: 'Install Terraform'
+      inputs:
+        terraformVersion: $(terraformVersion)
+
+    - task: PowerShell@2
+      displayName: 'Terraform Format Check'
+      inputs:
+        targetType: 'inline'
+        script: |
+          terraform fmt -check=true -recursive
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "##vso[task.logissue type=error]Terraform files are not properly formatted"
+            Write-Host "##vso[task.logissue type=error]Run 'terraform fmt -recursive' to fix formatting issues"
+            exit 1
+          }
+        workingDirectory: $(workingDirectory)
+        failOnStderr: false
+
+    - task: PowerShell@2
+      displayName: 'Terraform Init'
+      inputs:
+        targetType: 'inline'
+        script: |
+          terraform init -backend=false
+        workingDirectory: $(workingDirectory)
+
+    - task: PowerShell@2
+      displayName: 'Terraform Validate'
+      inputs:
+        targetType: 'inline'
+        script: |
+          terraform validate
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "##vso[task.logissue type=error]Terraform validation failed"
+            exit 1
+          }
+        workingDirectory: $(workingDirectory)
+
+    - task: PowerShell@2
+      displayName: 'Create Sample Variables File'
+      inputs:
+        targetType: 'inline'
+        script: |
+          @"
+          domain_name = "example.com"
+          domain_admin_users = ["admin@example.com"]
+          location = "West Europe"
+          sku = "Standard"
+          enable_secure_ldap = false
+          enable_diagnostic_settings = true
+          "@ | Out-File -FilePath "terraform.tfvars" -Encoding UTF8
+        workingDirectory: $(workingDirectory)
+
+    - task: PowerShell@2
+      displayName: 'Terraform Plan (Dry Run)'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $env:ARM_SKIP_PROVIDER_REGISTRATION = "true"
+          $env:ARM_USE_CLI = "false"
+          terraform plan -input=false -out=tfplan
+        workingDirectory: $(workingDirectory)
+      continueOnError: true
+
+    - task: PowerShell@2
+      displayName: 'Run tfsec Security Scan'
+      inputs:
+        targetType: 'inline'
+        script: |
+          # Install tfsec
+          Invoke-WebRequest -Uri "https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-linux-amd64" -OutFile "./tfsec"
+          chmod +x ./tfsec
+          
+          # Run tfsec
+          ./tfsec . --format json --out tfsec-results.json || true
+          
+          # Display results
+          if (Test-Path "tfsec-results.json") {
+            $results = Get-Content "tfsec-results.json" | ConvertFrom-Json
+            if ($results.results.Count -gt 0) {
+              Write-Host "##vso[task.logissue type=warning]tfsec found $($results.results.Count) security issue(s)"
+              foreach ($result in $results.results) {
+                Write-Host "##vso[task.logissue type=warning]$($result.rule_id): $($result.description)"
+              }
+            } else {
+              Write-Host "##vso[task.complete result=Succeeded;]No security issues found by tfsec"
+            }
+          }
+        workingDirectory: $(workingDirectory)
+      continueOnError: true
+
+    - task: PublishTestResults@2
+      displayName: 'Publish tfsec Results'
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: 'tfsec-results.xml'
+        searchFolder: $(workingDirectory)
+        mergeTestResults: true
+        failTaskOnFailedTests: false
+      condition: succeededOrFailed()
+      continueOnError: true
+
+- stage: TerraformDocumentation
+  displayName: 'Generate Documentation'
+  dependsOn: TerraformValidation
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - job: GenerateDocs
+    displayName: 'Generate Terraform Documentation'
+    steps:
+    
+    - task: PowerShell@2
+      displayName: 'Install terraform-docs'
+      inputs:
+        targetType: 'inline'
+        script: |
+          # Download and install terraform-docs
+          $version = "v0.16.0"
+          $url = "https://github.com/terraform-docs/terraform-docs/releases/download/$version/terraform-docs-$version-linux-amd64.tar.gz"
+          Invoke-WebRequest -Uri $url -OutFile "terraform-docs.tar.gz"
+          tar -xzf terraform-docs.tar.gz
+          chmod +x terraform-docs
+          sudo mv terraform-docs /usr/local/bin/
+
+    - task: PowerShell@2
+      displayName: 'Generate Documentation'
+      inputs:
+        targetType: 'inline'
+        script: |
+          terraform-docs markdown table . > docs/TERRAFORM_DOCS.md
+          
+          # Display generated documentation
+          Write-Host "Generated Terraform Documentation:"
+          Get-Content docs/TERRAFORM_DOCS.md | Write-Host
+        workingDirectory: $(workingDirectory)
+
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Documentation'
+      inputs:
+        PathtoPublish: '$(workingDirectory)/docs/TERRAFORM_DOCS.md'
+        ArtifactName: 'terraform-docs'
+        publishLocation: 'Container'
+
+- stage: SecurityCompliance
+  displayName: 'Security & Compliance'
+  dependsOn: TerraformValidation
+  jobs:
+  - job: SecurityScan
+    displayName: 'Security & Compliance Checks'
+    steps:
+    
+    - task: PowerShell@2
+      displayName: 'Check for Secrets in Code'
+      inputs:
+        targetType: 'inline'
+        script: |
+          # Simple secret detection patterns
+          $patterns = @(
+            "password\s*=\s*['\"].*['\"]",
+            "secret\s*=\s*['\"].*['\"]",
+            "key\s*=\s*['\"].*['\"]",
+            "token\s*=\s*['\"].*['\"]"
+          )
+          
+          $foundSecrets = $false
+          foreach ($pattern in $patterns) {
+            $matches = Select-String -Path "*.tf" -Pattern $pattern -AllMatches
+            if ($matches) {
+              Write-Host "##vso[task.logissue type=warning]Potential secret found: $($matches.Line)"
+              $foundSecrets = $true
+            }
+          }
+          
+          if (-not $foundSecrets) {
+            Write-Host "##vso[task.complete result=Succeeded;]No secrets detected in Terraform files"
+          }
+        workingDirectory: $(workingDirectory)
+
+    - task: PowerShell@2
+      displayName: 'Validate Azure Naming Conventions'
+      inputs:
+        targetType: 'inline'
+        script: |
+          # Check for Azure naming convention compliance
+          $namingIssues = @()
+          
+          # Check for proper resource naming patterns
+          $content = Get-Content "*.tf" -Raw
+          
+          # Resource group naming
+          if ($content -match 'resource_group_name.*=.*"([^"]*)"') {
+            $rgName = $matches[1]
+            if ($rgName -notmatch '^rg-') {
+              $namingIssues += "Resource group should start with 'rg-'"
+            }
+          }
+          
+          if ($namingIssues.Count -gt 0) {
+            foreach ($issue in $namingIssues) {
+              Write-Host "##vso[task.logissue type=warning]Naming convention issue: $issue"
+            }
+          } else {
+            Write-Host "##vso[task.complete result=Succeeded;]Naming conventions look good"
+          }
+        workingDirectory: $(workingDirectory)
+
+    - task: PublishCodeCoverageResults@1
+      displayName: 'Publish Compliance Report'
+      inputs:
+        codeCoverageTool: 'Cobertura'
+        summaryFileLocation: '$(workingDirectory)/coverage.xml'
+        reportDirectory: '$(workingDirectory)/coverage'
+      condition: succeededOrFailed()
+      continueOnError: true

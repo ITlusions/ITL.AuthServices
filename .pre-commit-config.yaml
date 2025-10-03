@@ -1,0 +1,111 @@
+# Pre-commit hooks for Terraform Microsoft Entra Domain Services Template
+# Install with: pip install pre-commit && pre-commit install
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: mixed-line-ending
+
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.83.5
+    hooks:
+      - id: terraform_fmt
+        description: Rewrites all Terraform configuration files to canonical format
+      - id: terraform_validate
+        description: Validates all Terraform configuration files
+        args:
+          - --hook-config=--retry-once-with-cleanup=true
+      - id: terraform_docs
+        description: Inserts input and output documentation into README.md
+        args:
+          - --hook-config=--path-to-file=TERRAFORM_DOCS.md
+          - --hook-config=--add-to-existing-file=true
+          - --hook-config=--create-file-if-not-exist=true
+      - id: terraform_tflint
+        description: Validates all Terraform configuration files with TFLint
+        args:
+          - --args=--only=terraform_deprecated_interpolation
+          - --args=--only=terraform_deprecated_index
+          - --args=--only=terraform_unused_declarations
+          - --args=--only=terraform_comment_syntax
+          - --args=--only=terraform_documented_outputs
+          - --args=--only=terraform_documented_variables
+          - --args=--only=terraform_typed_variables
+          - --args=--only=terraform_module_pinned_source
+          - --args=--only=terraform_naming_convention
+          - --args=--only=terraform_required_version
+          - --args=--only=terraform_required_providers
+          - --args=--only=terraform_standard_module_structure
+          - --args=--only=terraform_workspace_remote
+
+  - repo: https://github.com/aquasecurity/tfsec
+    rev: v1.28.4
+    hooks:
+      - id: tfsec
+        description: Static analysis of Terraform templates to spot potential security issues
+        args:
+          - --soft-fail
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        description: Detect secrets in committed code
+        args: ['--baseline', '.secrets.baseline']
+        exclude: package.lock.json
+
+  - repo: local
+    hooks:
+      - id: terraform-validate-local
+        name: Terraform validate with sample vars
+        entry: bash -c
+        language: system
+        args:
+          - |
+            if [ -f terraform.tfvars.example ]; then
+              cp terraform.tfvars.example terraform.tfvars.test
+              sed -i 's/yourdomain.com/test-domain.local/g' terraform.tfvars.test
+              sed -i 's/# "admin@yourdomain.com"/"admin@test-domain.local"/g' terraform.tfvars.test
+              terraform init -backend=false
+              terraform validate
+              rm -f terraform.tfvars.test
+            fi
+        files: '\.(tf|tfvars)$'
+        
+      - id: check-terraform-naming
+        name: Check Azure naming conventions
+        entry: bash -c
+        language: system
+        args:
+          - |
+            # Check for proper Azure resource naming conventions
+            if grep -r "resource_group_name.*=" . --include="*.tf" | grep -v "rg-"; then
+              echo "Error: Resource group names should follow 'rg-' prefix convention"
+              exit 1
+            fi
+            if grep -r "virtual_network_name.*=" . --include="*.tf" | grep -v "vnet-"; then
+              echo "Warning: Virtual network names should follow 'vnet-' prefix convention"
+            fi
+        files: '\.tf$'
+        
+      - id: check-sensitive-vars
+        name: Check for sensitive variables
+        entry: bash -c
+        language: system
+        args:
+          - |
+            # Ensure sensitive variables are marked as sensitive
+            sensitive_patterns="password|secret|key|token|credential"
+            if grep -r "variable.*\($sensitive_patterns\)" . --include="*.tf" | grep -v "sensitive.*=.*true"; then
+              echo "Error: Variables containing sensitive data should be marked with 'sensitive = true'"
+              exit 1
+            fi
+        files: '\.tf$'
